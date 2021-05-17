@@ -1,0 +1,115 @@
+//////// LC variables ///////
+
+variable "name" {}
+
+variable "image_id" {
+  default = ""
+}
+
+variable "instance_type" {}
+
+variable "iam_instance_profile" {
+  default = ""
+}
+
+variable "security_groups" {
+  type = "list"
+}
+
+variable "user_data" {
+  default = ""
+}
+
+variable "key_name" {}
+
+//////// ASG variables //////
+
+variable "asg_min" {
+  default = "1"
+}
+
+variable "asg_max" {
+  default = "1"
+}
+
+variable "asg_desired" {
+  default = "1"
+}
+
+variable "vpc_zone_identifier" {
+  type = "list"
+}
+
+variable "load_balancer" {
+  default = ""
+}
+
+variable "target_group_arn" {
+  default = ""
+}
+
+variable "root_volume_size" {
+  default = 32
+}
+
+resource "aws_launch_configuration" "lc" {
+  name_prefix          = "${var.name}-lc"
+  image_id             = "${var.image_id}"
+  instance_type        = "${var.instance_type}"
+  iam_instance_profile = "${var.iam_instance_profile}"
+  security_groups      = ["${var.security_groups}"]
+  user_data            = "${var.user_data}"
+  key_name             = "${var.key_name}"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  root_block_device {
+    volume_type = "gp2"
+    volume_size = "${var.root_volume_size}"
+  }
+
+  ebs_block_device {
+    device_name           = "/dev/xvdb"
+    volume_type           = "gp2"
+    volume_size           = "${var.extra_volume_size}"
+    delete_on_termination = true
+  }
+}
+
+resource "aws_autoscaling_group" "asg" {
+  name                 = "${var.name}-asg"
+  min_size             = "${var.asg_min}"
+  max_size             = "${var.asg_max}"
+  desired_capacity     = "${var.asg_desired}"
+  default_cooldown     = 10
+  launch_configuration = "${aws_launch_configuration.lc.name}"
+  vpc_zone_identifier  = "${var.vpc_zone_identifier}"
+  target_group_arns    = ["${var.target_group_arn}"]
+  load_balancers       = ["${var.load_balancer}"]
+  suspended_processes  = ["${var.asg_suspended_processes}"]
+
+  tags = "${var.tags}"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+output "asg_name" {
+  value = "${aws_autoscaling_group.asg.name}"
+}
+
+output "asg_id" {
+  value = "${aws_autoscaling_group.asg.id}"
+}
+
+output "asg_id_mod" {
+  value = "${ join("", aws_autoscaling_group.asg.id) }"
+}
+
+output "lc_name" {
+  value = "${aws_launch_configuration.lc.name}"
+}
+
